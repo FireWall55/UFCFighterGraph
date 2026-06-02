@@ -1,0 +1,8 @@
+class Edge:
+    def __init__(self, fighter1, fighter2):
+        self.fighter1 = fighter1
+        self.fighter2 = fighter2
+        self.fights = []
+        
+    def addFight(self, fight):
+        self.fights.append(fight)
