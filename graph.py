@@ -46,19 +46,23 @@ class Graph:
                 fighter1 = row[0]
                 fighter2 = row[1]
                 if((not fighter1 in self.fighters) or (not fighter2 in self.fighters)):
-                    continue
+                    continue #if one of the fighters isn't listed in the database
                 date = row[6]
                 location = row[7]
-                winner = ""
-                if(row[10]=="Red"):
-                    winner = fighter1.name
-                else:
-                    winner = fighter2.name
                 winner = row[10]
+                weight = row[12]
+                gender = row[13]
+
+
+                fight = Fight(date, location, winner, weight_class, gender)
+                edge = Edge(fighter1, fighter2)
+                edge.addFight(fight)
+                
                 
 
 graph = Graph()
 graph.parse_fighter_data(fileName='ufc-fighters-statistics.csv')
 graph.parse_fights(fileName="ufc-master.csv")
+print(graph.fighters)
 #for key,value in graph.fighters.items():
 #    print(f"name: {key}, object: {value}\n")
