@@ -1,4 +1,6 @@
 from fighter import Fighter
+from fight import Fight
+from edge import Edge
 import csv
 from datetime import datetime
 
@@ -54,9 +56,14 @@ class Graph:
                 gender = row[13]
 
 
-                fight = Fight(date, location, winner, weight_class, gender)
+                fight = Fight(date, location, winner, weight, gender)
                 edge = Edge(fighter1, fighter2)
                 edge.addFight(fight)
+                fighter1_o = self.fighters[fighter1]
+                fighter2_o = self.fighters[fighter2]
+                self.adj_list[fighter1_o].append(edge)
+                self.adj_list[fighter2_o].append(edge)
+
                 
                 
 
