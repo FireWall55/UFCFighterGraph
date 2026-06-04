@@ -6,3 +6,6 @@ class Edge:
         
     def addFight(self, fight):
         self.fights.append(fight)
+
+    def __str__(self):
+        return f"{self.fights}"

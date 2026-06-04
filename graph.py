@@ -57,10 +57,16 @@ class Graph:
 
 
                 fight = Fight(date, location, winner, weight, gender)
-                edge = Edge(fighter1, fighter2)
-                edge.addFight(fight)
+                #need to find if a current edge exists
                 fighter1_o = self.fighters[fighter1]
                 fighter2_o = self.fighters[fighter2]
+                edge = Edge(fighter1, fighter2)
+                for edge_t in self.adj_list[fighter1_o]: #temporary edge
+                    if edge_t.fighter1==fighter1 or edge_t.fighter2==fighter2:
+                        edge = edge_t
+                        
+                edge.addFight(fight)
+                
                 self.adj_list[fighter1_o].append(edge)
                 self.adj_list[fighter2_o].append(edge)
 
@@ -70,6 +76,8 @@ class Graph:
 graph = Graph()
 graph.parse_fighter_data(fileName='ufc-fighters-statistics.csv')
 graph.parse_fights(fileName="ufc-master.csv")
-print(graph.fighters)
+for key,value in graph.adj_list.items():
+    if len(value) > 0:
+        print(f"{key}: {value} : {value[0]}")
 #for key,value in graph.fighters.items():
 #    print(f"name: {key}, object: {value}\n")
