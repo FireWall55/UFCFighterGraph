@@ -53,9 +53,9 @@ class Graph:
                     continue #if one of the fighters isn't listed in the database
                 date = row[6]
                 location = row[7]
-                winner = row[10]
-                weight = row[12]
-                gender = row[13]
+                winner = row[9]
+                weight = row[11]
+                gender = row[12]
 
 
                 fight = Fight(date, location, winner, weight, gender)
@@ -80,7 +80,30 @@ class Graph:
         count = 0
         for edge in edges:
             count+=1
-        return count/(len(self.adj_list)-1) # 0 if connected to nobody, 1 if connected to everybody     
+        return count/(len(self.adj_list)-1) # 0 if connected to nobody, 1 if connected to everybody 
+    def weighted_degree_centrality(self):
+        """
+        Weighted Degree Centrality: total number of fights (not just opponents).
+        Fighters who fought more frequently rank higher even vs. the same opponents.
+        """
+        centrality = {}
+        fighters = list(self.adj_list.keys())
+        n = len(fighters)
+        if n <= 1:
+            return centrality
+
+        max_fights = 0
+        raw = {}
+        for fighter, edges in self.adj_list.items():
+            total_fights = sum(len(edge.fights) for edge in edges)
+            raw[fighter.name] = total_fights
+            if total_fights > max_fights:
+                max_fights = total_fights
+
+        for name, count in raw.items():
+            centrality[name] = count / max_fights if max_fights > 0 else 0
+
+        return centrality    
     def betweenness_centrality_single(self, fighter_name):
         if fighter_name not in self.fighters:
             return None
@@ -236,13 +259,13 @@ class Graph:
                 
                 
 
-graph = Graph()
-graph.parse_fighter_data(fileName='ufc-fighters-statistics.csv')
-graph.parse_fights(fileName="ufc-master.csv")
+#graph = Graph()
+#graph.parse_fighter_data(fileName='ufc-fighters-statistics.csv')
+#graph.parse_fights(fileName="ufc-master.csv")
 
-print(graph.fighters["Israel Adesanya"])
-print(graph.adj_list[graph.fighters["Israel Adesanya"]][0])
-print(graph.closeness_centrality("Khalid Taha"))
-print(graph.bfs("Khalid Taha", "Charles Johnson"))
-graph.export_json()
+#print(graph.fighters["Israel Adesanya"])
+#print(graph.adj_list[graph.fighters["Israel Adesanya"]][0])
+#print(graph.closeness_centrality("Khalid Taha"))
+#print(graph.bfs("Khalid Taha", "Charles Johnson"))
+#graph.export_json()
 

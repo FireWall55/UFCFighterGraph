@@ -1,0 +1,133 @@
+from flask import Flask, jsonify, request, render_template
+from graph import Graph
+
+app = Flask(__name__)
+
+# ── Load graph once at startup ──────────────────────────────
+print("Loading fighter data...")
+graph = Graph()
+graph.parse_fighter_data(fileName='ufc-fighters-statistics.csv')
+graph.parse_fights(fileName='ufc-master.csv')
+print(f"Loaded {len(graph.fighters)} fighters.")
+
+
+
+
+# ── Pre-compute cheap all-fighter measures at startup ───────
+# These are fast enough to do once upfront
+print("Computing degree and weighted degree centrality...")
+weighted_degree = graph.weighted_degree_centrality()
+print("Ready.")
+
+
+# ── API Routes ──────────────────────────────────────────────
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/api/search')
+def search():
+    """
+    Returns a lightweight list of matching fighters for the search bar.
+    Only name + nickname — no heavy computation.
+    """
+    q = request.args.get('q', '').strip().lower()
+    if not q:
+        return jsonify([])
+
+    results = []
+    for name, fighter in graph.fighters.items():
+        if q in name.lower():
+            results.append({
+                'name': fighter.name,
+                'nickname': fighter.nickname
+            })
+        if len(results) >= 8:
+            break
+
+    return jsonify(results)
+
+
+@app.route('/api/fighter/<name>')
+def fighter_profile(name):
+    """
+    Returns full profile for one fighter:
+    - Basic stats
+    - Fight record (with corner-aware win/loss)
+    - Degree + weighted degree centrality (pre-computed, fast)
+    """
+    fighter = graph.fighters.get(name)
+    if not fighter:
+        return jsonify({'error': 'Fighter not found'}), 404
+
+    edges = graph.adj_list.get(fighter, [])
+
+    # Build fight list, deduplicating rematches
+    fights = []
+    seen = set()
+    for edge in edges:
+        for fight in edge.fights:
+            key = (fight.date, edge.fighter1, edge.fighter2)
+            if key in seen:
+                continue
+            seen.add(key)
+
+            opponent = edge.fighter2 if edge.fighter1 == name else edge.fighter1
+            corner   = 'red' if edge.fighter1 == name else 'blue'
+
+            fights.append({
+                'opponent':     opponent,
+                'date':         fight.date,
+                'winner':       fight.winner,   # "Red" or "Blue"
+                'corner':       corner,          # which corner this fighter was in
+                'weight_class': fight.weight_class,
+                'gender':       fight.gender
+            })
+
+    # Sort newest first
+    fights.sort(key=lambda f: f['date'] or '', reverse=True)
+
+    return jsonify({
+        'name':     fighter.name,
+        'nickname': fighter.nickname,
+        'height':   fighter.height,
+        'weight':   fighter.weight,
+        'fights':   fights,
+        'centrality': {
+            'degree':          graph.degree_centrality(name),
+            'weighted_degree': weighted_degree.get(name, 0),
+        }
+    })
+
+
+@app.route('/api/fighter/<name>/closeness')
+def fighter_closeness(name):
+    """
+    Closeness centrality computed on demand — called separately
+    by the frontend after the profile page has already loaded,
+    so the user isn't waiting for it before seeing the page.
+    """
+    if name not in graph.fighters:
+        return jsonify({'error': 'Fighter not found'}), 404
+
+    score = graph.closeness_centrality(name)
+    return jsonify({'closeness': score})
+
+
+@app.route('/api/fighter/<name>/betweenness')
+def fighter_betweenness(name):
+    """
+    Betweenness centrality computed on demand — slowest measure,
+    loaded async after the page renders.
+    """
+    if name not in graph.fighters:
+        return jsonify({'error': 'Fighter not found'}), 404
+
+    score = graph.betweenness_centrality_single(name)
+    return jsonify({'betweenness': score})
+
+
+if __name__ == '__main__':
+    app.run(debug=True)
