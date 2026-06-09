@@ -1,0 +1,813 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>UFC Fighter Graph</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0D0D0D;
+      --panel:     #1A1A1A;
+      --border:    #2A2A2A;
+      --red:       #C8102E;
+      --gold:      #B8965A;
+      --white:     #F0EDE8;
+      --muted:     #6B6B6B;
+      --display:   'Bebas Neue', sans-serif;
+      --body:      'Inter', sans-serif;
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--white);
+      font-family: var(--body);
+      overflow: hidden;
+    }
+
+    /* ── APP SHELL ─────────────────────────────────────── */
+    #app {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .page {
+      position: absolute;
+      inset: 0;
+      transition: transform 0.45s cubic-bezier(0.77, 0, 0.175, 1),
+                  opacity  0.45s ease;
+    }
+
+    /* Search page sits at 0, profile page starts off to the right */
+    #search-page  { transform: translateX(0);     opacity: 1; }
+    #profile-page { transform: translateX(100%);  opacity: 0; pointer-events: none; }
+
+    #app.show-profile #search-page  { transform: translateX(-100%); opacity: 0; pointer-events: none; }
+    #app.show-profile #profile-page { transform: translateX(0);     opacity: 1; pointer-events: all; }
+
+    /* ── SEARCH PAGE ────────────────────────────────────── */
+    #search-page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      padding: 2rem;
+    }
+
+    .hero-eyebrow {
+      font-family: var(--body);
+      font-size: 0.7rem;
+      font-weight: 600;
+      letter-spacing: 0.3em;
+      color: var(--gold);
+      text-transform: uppercase;
+      margin-bottom: 0.5rem;
+    }
+
+    .hero-title {
+      font-family: var(--display);
+      font-size: clamp(4rem, 12vw, 9rem);
+      line-height: 0.88;
+      letter-spacing: 0.02em;
+      text-align: center;
+      color: var(--white);
+      margin-bottom: 0.2rem;
+    }
+
+    .hero-title span {
+      color: var(--red);
+    }
+
+    .hero-sub {
+      font-size: 0.78rem;
+      color: var(--muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      margin-bottom: 3rem;
+    }
+
+    .search-wrap {
+      position: relative;
+      width: min(540px, 90vw);
+    }
+
+    .search-wrap svg.search-icon {
+      position: absolute;
+      left: 1.1rem;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted);
+      pointer-events: none;
+    }
+
+    #search-input {
+      width: 100%;
+      padding: 1rem 1rem 1rem 3rem;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--white);
+      font-family: var(--body);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    #search-input:focus {
+      border-color: var(--red);
+    }
+
+    #search-input::placeholder { color: var(--muted); }
+
+    #results-dropdown {
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0; right: 0;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      max-height: 280px;
+      overflow-y: auto;
+      display: none;
+      z-index: 10;
+    }
+
+    #results-dropdown.open { display: block; }
+
+    .result-item {
+      padding: 0.75rem 1.1rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+
+    .result-item:last-child { border-bottom: none; }
+    .result-item:hover, .result-item.active { background: #252525; }
+
+    .result-avatar {
+      width: 32px; height: 32px;
+      border-radius: 50%;
+      background: var(--red);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--display);
+      font-size: 1rem;
+      color: var(--white);
+      flex-shrink: 0;
+    }
+
+    .result-name {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--white);
+    }
+
+    .result-nickname {
+      font-size: 0.72rem;
+      color: var(--gold);
+      margin-top: 1px;
+    }
+
+    .no-results {
+      padding: 1rem 1.1rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+
+    /* ── PROFILE PAGE ───────────────────────────────────── */
+    #profile-page {
+      display: grid;
+      grid-template-rows: auto 1fr;
+      grid-template-columns: 1fr 360px;
+      grid-template-areas:
+        "header header"
+        "main   sidebar";
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Header */
+    .profile-header {
+      grid-area: header;
+      display: flex;
+      align-items: center;
+      padding: 1.2rem 2.5rem;
+      border-bottom: 1px solid var(--border);
+      gap: 1.5rem;
+      background: var(--bg);
+    }
+
+    .back-btn {
+      background: none;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.45rem 0.9rem;
+      border-radius: 3px;
+      cursor: pointer;
+      font-family: var(--body);
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      transition: color 0.2s, border-color 0.2s;
+      flex-shrink: 0;
+    }
+    .back-btn:hover { color: var(--white); border-color: var(--white); }
+
+    .header-divider {
+      width: 1px; height: 28px;
+      background: var(--border);
+      flex-shrink: 0;
+    }
+
+    .header-eyebrow {
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 2px;
+    }
+
+    .header-name {
+      font-family: var(--display);
+      font-size: 1.6rem;
+      line-height: 1;
+      letter-spacing: 0.04em;
+    }
+
+    /* Main area */
+    .profile-main {
+      grid-area: main;
+      overflow-y: auto;
+      padding: 2.5rem;
+    }
+
+    /* Giant name treatment — the signature element */
+    .fighter-display-name {
+      font-family: var(--display);
+      font-size: clamp(4rem, 9vw, 7.5rem);
+      line-height: 0.85;
+      letter-spacing: 0.02em;
+      color: var(--white);
+      margin-bottom: 0.3rem;
+      overflow: hidden;
+    }
+
+    .fighter-nickname-display {
+      font-size: 0.8rem;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 2.5rem;
+    }
+
+    /* Stats grid */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+      margin-bottom: 2.5rem;
+    }
+
+    .stat-cell {
+      background: var(--panel);
+      padding: 1rem 1.2rem;
+    }
+
+    .stat-label {
+      font-size: 0.62rem;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+
+    .stat-value {
+      font-family: var(--display);
+      font-size: 1.6rem;
+      letter-spacing: 0.03em;
+      color: var(--white);
+      line-height: 1;
+    }
+
+    .stat-value.red { color: var(--red); }
+    .stat-value.gold { color: var(--gold); }
+
+    /* Centrality section */
+    .section-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .centrality-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1px;
+      background: var(--border);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .centrality-cell {
+      background: var(--panel);
+      padding: 1rem 1.2rem;
+    }
+
+    .centrality-label {
+      font-size: 0.62rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .centrality-value {
+      font-family: var(--display);
+      font-size: 1.4rem;
+      color: var(--red);
+      letter-spacing: 0.03em;
+    }
+
+    .centrality-desc {
+      font-size: 0.68rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+      line-height: 1.4;
+    }
+
+    /* ── SIDEBAR ────────────────────────────────────────── */
+    .profile-sidebar {
+      grid-area: sidebar;
+      border-left: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .sidebar-header {
+      padding: 1.5rem 1.5rem 1rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 2;
+    }
+
+    .sidebar-title {
+      font-size: 0.65rem;
+      letter-spacing: 0.25em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .sidebar-count {
+      font-family: var(--display);
+      font-size: 2rem;
+      color: var(--white);
+      line-height: 1;
+      margin-top: 0.2rem;
+    }
+
+    .sidebar-count span { color: var(--red); }
+
+    .fights-list {
+      flex: 1;
+      padding: 0.5rem 0;
+    }
+
+    .fight-card {
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+
+    .fight-card:hover { background: #1f1f1f; }
+    .fight-card:last-child { border-bottom: none; }
+
+    .fight-opponent {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: var(--white);
+      margin-bottom: 0.3rem;
+    }
+
+    .fight-opponent:hover { color: var(--gold); cursor: pointer; text-decoration: underline; text-decoration-color: var(--gold); }
+
+    .fight-meta {
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .fight-tag {
+      font-size: 0.62rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 0.2rem 0.5rem;
+      border-radius: 2px;
+      font-weight: 500;
+    }
+
+    .tag-win    { background: rgba(34, 197, 94, 0.15);  color: #4ade80; }
+    .tag-loss   { background: rgba(200, 16, 46, 0.15);  color: #f87171; }
+    .tag-nc     { background: rgba(184, 150, 90, 0.15); color: var(--gold); }
+
+    .fight-date {
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    .fight-weight {
+      font-size: 0.68rem;
+      color: var(--muted);
+    }
+
+    /* Scrollbar styling */
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+    /* Loading state */
+    .loading-text {
+      color: var(--muted);
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 2rem 1.5rem;
+    }
+
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── SEARCH PAGE ── -->
+  <div id="search-page" class="page">
+    <p class="hero-eyebrow">Fighter Graph Analysis</p>
+    <h1 class="hero-title">UFC<br/><span>GRAPH</span></h1>
+    <p class="hero-sub">Centrality · Connection · Record</p>
+
+    <div class="search-wrap">
+      <svg class="search-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+      </svg>
+      <input
+        id="search-input"
+        type="text"
+        placeholder="Search fighter by name…"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <div id="results-dropdown"></div>
+    </div>
+  </div>
+
+  <!-- ── PROFILE PAGE ── -->
+  <div id="profile-page" class="page">
+    <header class="profile-header">
+      <button class="back-btn" id="back-btn">← Back</button>
+      <div class="header-divider"></div>
+      <div>
+        <div class="header-eyebrow">Fighter Profile</div>
+        <div class="header-name" id="header-name">—</div>
+      </div>
+    </header>
+
+    <main class="profile-main" id="profile-main">
+      <!-- injected by JS -->
+    </main>
+
+    <aside class="profile-sidebar">
+      <div class="sidebar-header">
+        <div class="sidebar-title">Fight Record</div>
+        <div class="sidebar-count" id="sidebar-count"><span>0</span> Fights</div>
+      </div>
+      <div class="fights-list" id="fights-list">
+        <div class="loading-text">Select a fighter to load record</div>
+      </div>
+    </aside>
+  </div>
+
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────
+//  DATA BRIDGE
+//  Replace FIGHTERS_DATA with real data exported from your Python
+//  graph. The format expected:
+//
+//  FIGHTERS_DATA = [
+//    {
+//      name: "Israel Adesanya",
+//      nickname: "The Last Stylebender",
+//      height: "6'4\"",
+//      weight: "185",
+//      fights: [
+//        { opponent: "Alex Pereira", date: "2022-11-12", winner: "Alex Pereira", weight_class: "Middleweight", gender: "Male" },
+//        ...
+//      ],
+//      centrality: {
+//        degree: 0.042,
+//        weighted_degree: 0.31,
+//        closeness: 0.18,
+//        betweenness: 0.0021
+//      }
+//    },
+//    ...
+//  ]
+//
+//  To generate this from Python, add to graph.py:
+//
+//    import json
+//    def export_json(self, path="fighters_data.json"):
+//        out = []
+//        for fighter, edges in self.adj_list.items():
+//            fights = []
+//            seen = set()
+//            for edge in edges:
+//                for fight in edge.fights:
+//                    key = (fight.date, edge.fighter1, edge.fighter2)
+//                    if key not in seen:
+//                        seen.add(key)
+//                        opponent = edge.fighter2 if edge.fighter1 == fighter.name else edge.fighter1
+//                        fights.append({
+//                            "opponent": opponent, "date": fight.date,
+//                            "winner": fight.winner, "weight_class": fight.weight_class,
+//                            "gender": fight.gender
+//                        })
+//            out.append({
+//                "name": fighter.name, "nickname": fighter.nickname,
+//                "height": fighter.height, "weight": fighter.weight,
+//                "fights": fights,
+//                "centrality": { "degree": self.degree_centrality(fighter.name),
+//                                "closeness": 0, "weighted_degree": 0, "betweenness": 0 }
+//            })
+//        with open(path, "w") as f:
+//            json.dump(out, f)
+//
+// ─────────────────────────────────────────────────────────────
+
+  let FIGHTERS_DATA = [];
+
+  // Try to fetch fighters_data.json (generated by Python export).
+  // Falls back to demo data if unavailable.
+  async function loadData() {
+    try {
+      const res = await fetch('fighters_data.json');
+      if (!res.ok) throw new Error('not found');
+      FIGHTERS_DATA = await res.json();
+    } catch {
+      // Demo data so the UI is functional standalone
+      FIGHTERS_DATA = [
+        {
+          name: "Israel Adesanya", nickname: "The Last Stylebender",
+          height: "6'4\"", weight: "185",
+          fights: [
+            { opponent: "Alex Pereira",    date: "2022-11-12", winner: "Alex Pereira",    weight_class: "Middleweight", gender: "Male" },
+            { opponent: "Jared Cannonier", date: "2022-07-02", winner: "Israel Adesanya", weight_class: "Middleweight", gender: "Male" },
+            { opponent: "Robert Whittaker", date: "2021-02-06", winner: "Israel Adesanya", weight_class: "Middleweight", gender: "Male" },
+            { opponent: "Jan Blachowicz",  date: "2021-03-06", winner: "Jan Blachowicz",  weight_class: "Light Heavyweight", gender: "Male" },
+            { opponent: "Yoel Romero",     date: "2020-03-07", winner: "Israel Adesanya", weight_class: "Middleweight", gender: "Male" },
+          ],
+          centrality: { degree: 0.041, weighted_degree: 0.29, closeness: 0.17, betweenness: 0.0031 }
+        },
+        {
+          name: "Conor McGregor", nickname: "The Notorious",
+          height: "5'9\"", weight: "155",
+          fights: [
+            { opponent: "Dustin Poirier",  date: "2021-07-10", winner: "Dustin Poirier",  weight_class: "Lightweight", gender: "Male" },
+            { opponent: "Dustin Poirier",  date: "2021-01-23", winner: "Dustin Poirier",  weight_class: "Lightweight", gender: "Male" },
+            { opponent: "Donald Cerrone",  date: "2020-01-18", winner: "Conor McGregor",  weight_class: "Welterweight", gender: "Male" },
+            { opponent: "Khabib Nurmagomedov", date: "2018-10-06", winner: "Khabib Nurmagomedov", weight_class: "Lightweight", gender: "Male" },
+          ],
+          centrality: { degree: 0.038, weighted_degree: 0.34, closeness: 0.20, betweenness: 0.0044 }
+        },
+        {
+          name: "Jon Jones", nickname: "Bones",
+          height: "6'4\"", weight: "205",
+          fights: [
+            { opponent: "Ciryl Gane",      date: "2023-03-04", winner: "Jon Jones",       weight_class: "Heavyweight", gender: "Male" },
+            { opponent: "Dominick Reyes",  date: "2020-02-08", winner: "Jon Jones",       weight_class: "Light Heavyweight", gender: "Male" },
+            { opponent: "Thiago Santos",   date: "2019-07-06", winner: "Jon Jones",       weight_class: "Light Heavyweight", gender: "Male" },
+          ],
+          centrality: { degree: 0.051, weighted_degree: 0.41, closeness: 0.22, betweenness: 0.0062 }
+        },
+        {
+          name: "Khalid Taha", nickname: "",
+          height: "5'7\"", weight: "135",
+          fights: [
+            { opponent: "Charles Johnson", date: "2022-09-17", winner: "Charles Johnson", weight_class: "Flyweight", gender: "Male" },
+            { opponent: "Bruno Silva",     date: "2021-10-02", winner: "Khalid Taha",     weight_class: "Bantamweight", gender: "Male" },
+          ],
+          centrality: { degree: 0.008, weighted_degree: 0.05, closeness: 0.09, betweenness: 0.0001 }
+        }
+      ];
+    }
+    initSearch();
+  }
+
+  // ── SEARCH ──────────────────────────────────────────────────
+  function initSearch() {
+    const input    = document.getElementById('search-input');
+    const dropdown = document.getElementById('results-dropdown');
+    let activeIdx  = -1;
+
+    input.addEventListener('input', () => {
+      const q = input.value.trim().toLowerCase();
+      dropdown.innerHTML = '';
+      activeIdx = -1;
+
+      if (!q) { dropdown.classList.remove('open'); return; }
+
+      const matches = FIGHTERS_DATA
+        .filter(f => f.name.toLowerCase().includes(q))
+        .slice(0, 8);
+
+      if (matches.length === 0) {
+        dropdown.innerHTML = '<div class="no-results">No fighters found</div>';
+      } else {
+        matches.forEach((f, i) => {
+          const el = document.createElement('div');
+          el.className = 'result-item';
+          el.dataset.idx = i;
+          el.innerHTML = `
+            <div class="result-avatar">${f.name[0]}</div>
+            <div>
+              <div class="result-name">${highlight(f.name, q)}</div>
+              ${f.nickname ? `<div class="result-nickname">"${f.nickname}"</div>` : ''}
+            </div>`;
+          el.addEventListener('click', () => openProfile(f));
+          dropdown.appendChild(el);
+        });
+      }
+
+      dropdown.classList.add('open');
+    });
+
+    // Keyboard nav
+    input.addEventListener('keydown', (e) => {
+      const items = dropdown.querySelectorAll('.result-item');
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        activeIdx = Math.min(activeIdx + 1, items.length - 1);
+        items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        activeIdx = Math.max(activeIdx - 1, 0);
+        items.forEach((el, i) => el.classList.toggle('active', i === activeIdx));
+      } else if (e.key === 'Enter' && activeIdx >= 0) {
+        const matches = FIGHTERS_DATA.filter(f => f.name.toLowerCase().includes(input.value.trim().toLowerCase()));
+        if (matches[activeIdx]) openProfile(matches[activeIdx]);
+      } else if (e.key === 'Escape') {
+        dropdown.classList.remove('open');
+      }
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!e.target.closest('.search-wrap')) dropdown.classList.remove('open');
+    });
+  }
+
+  function highlight(name, q) {
+    const idx = name.toLowerCase().indexOf(q);
+    if (idx === -1) return name;
+    return name.slice(0, idx)
+      + `<span style="color:var(--red)">${name.slice(idx, idx + q.length)}</span>`
+      + name.slice(idx + q.length);
+  }
+
+  // ── PROFILE ─────────────────────────────────────────────────
+  function openProfile(fighter) {
+    document.getElementById('search-input').value = '';
+    document.getElementById('results-dropdown').classList.remove('open');
+
+    document.getElementById('header-name').textContent = fighter.name;
+
+    // Main area
+    const c = fighter.centrality || {};
+    document.getElementById('profile-main').innerHTML = `
+      <div class="fighter-display-name">${fighter.name.toUpperCase()}</div>
+      ${fighter.nickname ? `<div class="fighter-nickname-display">"${fighter.nickname}"</div>` : '<div style="margin-bottom:2.5rem"></div>'}
+
+      <div class="section-label" style="margin-bottom:1rem">Physical Stats</div>
+      <div class="stats-grid" style="margin-bottom:2.5rem">
+        <div class="stat-cell">
+          <div class="stat-label">Height</div>
+          <div class="stat-value">${fighter.height || '—'}</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Weight Class</div>
+          <div class="stat-value gold">${fighter.weight ? fighter.weight + ' lbs' : '—'}</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Total Fights</div>
+          <div class="stat-value red">${fighter.fights ? fighter.fights.length : 0}</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Wins</div>
+          <div class="stat-value">${countWins(fighter)}</div>
+        </div>
+        <div class="stat-cell">
+          <div class="stat-label">Losses</div>
+          <div class="stat-value">${countLosses(fighter)}</div>
+        </div>
+      </div>
+
+      <div class="section-label">Centrality Measures</div>
+      <div class="centrality-grid">
+        <div class="centrality-cell">
+          <div class="centrality-label">Degree</div>
+          <div class="centrality-value">${fmt(c.degree)}</div>
+          <div class="centrality-desc">Unique opponents as fraction of all fighters</div>
+        </div>
+        <div class="centrality-cell">
+          <div class="centrality-label">Weighted Degree</div>
+          <div class="centrality-value">${fmt(c.weighted_degree)}</div>
+          <div class="centrality-desc">Total fights relative to most active fighter</div>
+        </div>
+        <div class="centrality-cell">
+          <div class="centrality-label">Closeness</div>
+          <div class="centrality-value">${fmt(c.closeness)}</div>
+          <div class="centrality-desc">How quickly this fighter reaches the whole graph</div>
+        </div>
+        <div class="centrality-cell">
+          <div class="centrality-label">Betweenness</div>
+          <div class="centrality-value">${fmt(c.betweenness)}</div>
+          <div class="centrality-desc">Bridge role between different fighter circles</div>
+        </div>
+      </div>
+    `;
+
+    // Sidebar fight record
+    const fights = fighter.fights || [];
+    document.getElementById('sidebar-count').innerHTML =
+      `<span>${fights.length}</span> Fight${fights.length !== 1 ? 's' : ''}`;
+
+    if (fights.length === 0) {
+      document.getElementById('fights-list').innerHTML =
+        '<div class="loading-text">No recorded fights</div>';
+    } else {
+      const sorted = [...fights].sort((a, b) => new Date(b.date) - new Date(a.date));
+      document.getElementById('fights-list').innerHTML = sorted.map(fight => {
+        const won = (fight.winner === "Red" && fight.corner === "red") ||
+            (fight.winner === "Blue" && fight.corner === "blue");
+        const draw = !fight.winner || fight.winner === 'Draw' || fight.winner === 'NC';
+        const tagClass = draw ? 'tag-nc' : won ? 'tag-win' : 'tag-loss';
+        const tagLabel = draw ? (fight.winner || 'NC') : won ? 'W' : 'L';
+        return `
+          <div class="fight-card">
+            <div class="fight-opponent" onclick="navigateTo('${escAttr(fight.opponent)}')">${fight.opponent}</div>
+            <div class="fight-meta">
+              <span class="fight-tag ${tagClass}">${tagLabel}</span>
+              <span class="fight-date">${formatDate(fight.date)}</span>
+              <span class="fight-weight">${fight.weight_class || ''}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    document.getElementById('app').classList.add('show-profile');
+  }
+
+  function navigateTo(name) {
+    const fighter = FIGHTERS_DATA.find(f => f.name === name);
+    if (fighter) openProfile(fighter);
+  }
+
+  document.getElementById('back-btn').addEventListener('click', () => {
+    document.getElementById('app').classList.remove('show-profile');
+    setTimeout(() => { document.getElementById('search-input').focus(); }, 450);
+  });
+
+  // ── HELPERS ─────────────────────────────────────────────────
+  function countWins(f)   { return (f.fights || []).filter(fight => fight.winner === f.name).length; }
+  function countLosses(f) { return (f.fights || []).filter(fight => fight.winner && fight.winner !== f.name && fight.winner !== 'Draw' && fight.winner !== 'NC').length; }
+  function fmt(v)         { return (v == null || v === 0) ? '—' : v < 0.001 ? v.toExponential(2) : v.toFixed(4); }
+  function formatDate(d)  { if (!d) return ''; try { return new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }); } catch { return d; } }
+  function escAttr(s)     { return (s || '').replace(/'/g, "\\'"); }
+
+  loadData();
+</script>
+</body>
+</html>

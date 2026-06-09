@@ -4,6 +4,7 @@ from edge import Edge
 import csv
 from datetime import datetime
 from collections import deque
+import json
 
 class Graph:
     def __init__(self):
@@ -80,18 +81,14 @@ class Graph:
         for edge in edges:
             count+=1
         return count/(len(self.adj_list)-1) # 0 if connected to nobody, 1 if connected to everybody     
-    def betweenness_centrality(self):
-        """
-        Betweenness Centrality: how often a fighter lies on the shortest path
-        between two other fighters. High = a 'bridge' between different circles.
-        Uses Brandes' algorithm (unweighted BFS).
-        """
-        centrality = {fighter.name: 0.0 for fighter in self.adj_list}
+    def betweenness_centrality_single(self, fighter_name):
+        if fighter_name not in self.fighters:
+            return None
+
         fighters = list(self.adj_list.keys())
         n = len(fighters)
 
-        # Build a fast adjacency lookup: name -> list of neighbor names
-        name_to_fighter = self.fighters
+        # Build name -> neighbors lookup
         adj_by_name = {}
         for fighter, edges in self.adj_list.items():
             neighbors = []
@@ -100,46 +97,45 @@ class Graph:
                 neighbors.append(neighbor)
             adj_by_name[fighter.name] = neighbors
 
+        score = 0.0
+
         for source in fighters:
-            # Brandes' algorithm
+            if source.name == fighter_name:
+                continue
+
+            # Brandes BFS from this source
             stack = []
             predecessors = {f.name: [] for f in fighters}
-            sigma = {f.name: 0 for f in fighters}   # shortest path counts
-            dist = {f.name: -1 for f in fighters}    # distances
+            sigma = {f.name: 0 for f in fighters}
+            dist  = {f.name: -1 for f in fighters}
 
             sigma[source.name] = 1
-            dist[source.name] = 0
+            dist[source.name]  = 0
             queue = deque([source.name])
 
             while queue:
                 v = queue.popleft()
                 stack.append(v)
                 for w in adj_by_name.get(v, []):
-                    if dist[w] == -1:           # first time visiting w
+                    if dist[w] == -1:
                         queue.append(w)
                         dist[w] = dist[v] + 1
-                    if dist[w] == dist[v] + 1:  # shortest path through v
+                    if dist[w] == dist[v] + 1:
                         sigma[w] += sigma[v]
                         predecessors[w].append(v)
 
-            # Accumulate dependencies
+            # Accumulate dependency, but only track fighter_name's score
             delta = {f.name: 0.0 for f in fighters}
             while stack:
                 w = stack.pop()
                 for v in predecessors[w]:
                     if sigma[w] != 0:
                         delta[v] += (sigma[v] / sigma[w]) * (1 + delta[w])
-                if w != source.name:
-                    centrality[w] += delta[w]
+                if w != source.name and w == fighter_name:
+                    score += delta[w]
 
-        # Normalize by (n-1)(n-2) for directed interpretation
         norm = (n - 1) * (n - 2)
-        if norm > 0:
-            for name in centrality:
-                centrality[name] /= norm
-
-        return centrality
-    
+        return score / norm if norm > 0 else 0.0
     def closeness_centrality(self, fighter_name):
         if fighter_name not in self.fighters:
             return None
@@ -198,6 +194,45 @@ class Graph:
         return []  # couldn't find target
 
 
+    def export_json(self, path="fighters_data.json"):
+        out = []
+        i = 0
+        for fighter, edges in self.adj_list.items():
+            if(len(edges)==0):
+                continue
+            fights = []
+            seen = set()
+            for edge in edges:
+                for fight in edge.fights:
+                    key = (fight.date, edge.fighter1, edge.fighter2)
+                    if key not in seen:
+                        seen.add(key)
+                        opponent = edge.fighter2 if edge.fighter1 == fighter.name else edge.fighter1
+                        fights.append({
+                            "opponent": opponent,
+                            "date": fight.date,
+                            "winner": fight.winner,
+                            "corner": "red" if edge.fighter1 == fighter.name else "blue",
+                            "weight_class": fight.weight_class,
+                            "gender": fight.gender
+                        })
+            out.append({
+                "name": fighter.name,
+                "nickname": fighter.nickname,
+                "height": fighter.height,
+                "weight": fighter.weight,
+                "fights": fights,
+                "centrality": {
+                    "degree": self.degree_centrality(fighter.name),
+                    "weighted_degree": 0,   # plug in your methods
+                    "closeness": self.closeness_centrality(fighter.name),
+                    "betweenness": self.betweenness_centrality_single(fighter.name)
+                }
+            })
+            i+=1
+            print(f"number completed: {i}")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(out, f, ensure_ascii=False)
                 
                 
 
@@ -209,4 +244,5 @@ print(graph.fighters["Israel Adesanya"])
 print(graph.adj_list[graph.fighters["Israel Adesanya"]][0])
 print(graph.closeness_centrality("Khalid Taha"))
 print(graph.bfs("Khalid Taha", "Charles Johnson"))
+graph.export_json()
 
