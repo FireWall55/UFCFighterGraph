@@ -161,9 +161,10 @@
 
     /* ── RANKINGS PAGE ── */
     #rankings-page {
-      display: grid;
-      grid-template-rows: auto 1fr;
-      height: 100vh; overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      inset: 0;
     }
 
     .rankings-body {
@@ -173,14 +174,19 @@
       grid-template-columns: 1fr 1fr;
       gap: 2rem;
       align-content: start;
+      position: absolute;
+      top: 57px; /* height of the header */
+      bottom: 0;
+      left: 0;
+      right: 0;
     }
 
     .ranking-list-card {
       border: 1px solid var(--border);
       border-radius: 4px;
-      overflow: hidden;
       display: flex;
       flex-direction: column;
+      max-height: 55vh;
     }
 
     .ranking-list-header {
@@ -190,6 +196,7 @@
       display: flex;
       align-items: baseline;
       gap: 0.75rem;
+      flex-shrink: 0;
     }
 
     .ranking-list-title {
@@ -206,7 +213,7 @@
       color: var(--muted);
     }
 
-    .ranking-rows { flex: 1; }
+    .ranking-rows { flex: 1; overflow-y: auto; }
 
     .ranking-row {
       display: flex;
@@ -240,6 +247,74 @@
       color: var(--red);
       flex-shrink: 0;
       letter-spacing: 0.03em;
+    }
+
+    /* Rivalry card spans both columns */
+    .rivalry-card {
+      grid-column: 1 / -1;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      display: flex;
+      flex-direction: column;
+      max-height: 55vh;
+    }
+
+    .rivalry-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      padding: 0.75rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      transition: background 0.15s;
+    }
+    .rivalry-row:last-child { border-bottom: none; }
+    .rivalry-row:hover { background: #1f1f1f; }
+
+    .rivalry-pos { font-family: var(--display); font-size: 1.1rem; color: var(--muted); width: 28px; flex-shrink: 0; text-align: right; }
+    .rivalry-pos.top { color: var(--gold); }
+
+    .rivalry-fighters {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      min-width: 0;
+    }
+
+    .rivalry-name {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--white);
+      cursor: pointer;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .rivalry-name:hover { color: var(--gold); text-decoration: underline; text-decoration-color: var(--gold); }
+
+    .rivalry-vs {
+      font-size: 0.65rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--red);
+      flex-shrink: 0;
+    }
+
+    .rivalry-count {
+      font-family: var(--display);
+      font-size: 1.1rem;
+      color: var(--red);
+      flex-shrink: 0;
+      letter-spacing: 0.03em;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .rivalry-count-label {
+      font-size: 0.62rem;
+      color: var(--muted);
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
     }
 
     /* shared util */
@@ -518,11 +593,12 @@
     rankingsLoaded = true;
 
     const lists = [
-      { key: 'degree',    title: 'Degree',    desc: 'Most connected fighters',           scoreKey: 'degree' },
-      { key: 'closeness', title: 'Closeness', desc: 'Fastest path through the network',  scoreKey: 'closeness' },
+      { key: 'degree',    title: 'Degree',    desc: 'Most connected fighters',          scoreKey: 'degree' },
+      { key: 'closeness', title: 'Closeness', desc: 'Fastest path through the network', scoreKey: 'closeness' },
     ];
 
-    body.innerHTML = lists.map(list => {
+    // Centrality list cards
+    const centralityHTML = lists.map(list => {
       const fighters = data[list.key] || [];
       const rows = fighters.slice(0, 50).map((f, i) => `
         <div class="ranking-row" onclick="openProfile('${escAttr(f.name)}')">
@@ -533,7 +609,6 @@
           </div>
           <div class="ranking-score">${fmt(f[list.scoreKey])}</div>
         </div>`).join('');
-
       return `
         <div class="ranking-list-card">
           <div class="ranking-list-header">
@@ -543,6 +618,33 @@
           <div class="ranking-rows">${rows}</div>
         </div>`;
     }).join('');
+
+    // Rivalries card — spans full width
+    const rivalries = data.rivalries || [];
+    const rivalryRows = rivalries.slice(0, 50).map((r, i) => `
+      <div class="rivalry-row">
+        <div class="rivalry-pos ${i < 3 ? 'top' : ''}">${i + 1}</div>
+        <div class="rivalry-fighters">
+          <span class="rivalry-name" onclick="openProfile('${escAttr(r.fighter1)}')">${r.fighter1}</span>
+          <span class="rivalry-vs">vs</span>
+          <span class="rivalry-name" onclick="openProfile('${escAttr(r.fighter2)}')">${r.fighter2}</span>
+        </div>
+        <div class="rivalry-count">
+          ${r.fights}
+          <div class="rivalry-count-label">fights</div>
+        </div>
+      </div>`).join('');
+
+    const rivalryHTML = `
+      <div class="rivalry-card">
+        <div class="ranking-list-header">
+          <div class="ranking-list-title">Rivalries</div>
+          <div class="ranking-list-desc">Fighters who have met more than once</div>
+        </div>
+        <div class="ranking-rows">${rivalryRows || '<div class="placeholder-text">No rivalries found</div>'}</div>
+      </div>`;
+
+    body.innerHTML = centralityHTML + rivalryHTML;
   }
 
   // ── HELPERS ──────────────────────────────────────────────────
