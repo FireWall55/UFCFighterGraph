@@ -256,7 +256,16 @@ class Graph:
             print(f"number completed: {i}")
         with open(path, "w", encoding="utf-8") as f:
             json.dump(out, f, ensure_ascii=False)
-                
+    def find_rivals(self):
+        rivals = []
+        seen = set()
+        for fighter, edges in self.adj_list.items():
+            for edge in edges:
+                key = tuple(sorted([edge.fighter1, edge.fighter2]))
+                if len(edge.fights) > 1 and key not in seen:
+                    seen.add(key)
+                    rivals.append((edge.fighter1, edge.fighter2, len(edge.fights)))
+        return rivals
                 
 
 #graph = Graph()
