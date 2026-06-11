@@ -141,6 +141,51 @@ def fighter_betweenness(name):
     return jsonify({'betweenness': score})
 
 
+@app.route('/api/bfs')
+def bfs_route():
+    """
+    Runs BFS between two fighters and returns the path.
+    """
+    start  = request.args.get('start', '').strip()
+    target = request.args.get('target', '').strip()
+
+    if not start or not target:
+        return jsonify({'error': 'Both start and target are required'}), 400
+    if start not in graph.fighters:
+        return jsonify({'error': f'Fighter "{start}" not found'}), 404
+    if target not in graph.fighters:
+        return jsonify({'error': f'Fighter "{target}" not found'}), 404
+    if start == target:
+        return jsonify({'path': [start], 'length': 0})
+
+    path = graph.bfs(start, target)
+    if not path:
+        return jsonify({'path': [], 'length': -1})
+
+    return jsonify({'path': path, 'length': len(path) - 1})
+
+
+@app.route('/api/fighters')
+def all_fighters():
+    """
+    Returns lightweight data for all fighters with at least one fight.
+    Used by the filter page — no centrality computation.
+    """
+    out = []
+    for fighter, edges in graph.adj_list.items():
+        if len(edges) == 0:
+            continue
+        fight_count = sum(len(e.fights) for e in edges) // 2  # edges are shared, so halve
+        out.append({
+            'name':        fighter.name,
+            'nickname':    fighter.nickname,
+            'height':      fighter.height,
+            'weight':      fighter.weight,
+            'fight_count': fight_count,
+        })
+    return jsonify(out)
+
+
 @app.route('/api/rankings')
 def rankings():
     """

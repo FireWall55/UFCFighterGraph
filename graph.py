@@ -82,10 +82,6 @@ class Graph:
             count+=1
         return count/(len(self.adj_list)-1) # 0 if connected to nobody, 1 if connected to everybody 
     def weighted_degree_centrality(self):
-        """
-        Weighted Degree Centrality: total number of fights (not just opponents).
-        Fighters who fought more frequently rank higher even vs. the same opponents.
-        """
         centrality = {}
         fighters = list(self.adj_list.keys())
         n = len(fighters)
@@ -111,7 +107,6 @@ class Graph:
         fighters = list(self.adj_list.keys())
         n = len(fighters)
 
-        # Build name -> neighbors lookup
         adj_by_name = {}
         for fighter, edges in self.adj_list.items():
             neighbors = []
@@ -126,7 +121,6 @@ class Graph:
             if source.name == fighter_name:
                 continue
 
-            # Brandes BFS from this source
             stack = []
             predecessors = {f.name: [] for f in fighters}
             sigma = {f.name: 0 for f in fighters}
@@ -147,7 +141,6 @@ class Graph:
                         sigma[w] += sigma[v]
                         predecessors[w].append(v)
 
-            # Accumulate dependency, but only track fighter_name's score
             delta = {f.name: 0.0 for f in fighters}
             while stack:
                 w = stack.pop()
@@ -178,7 +171,7 @@ class Graph:
         if reachable == 0:
             return 0.0
 
-        # Wasserman-Faust normalization
+        #Wasserman-Faust thing
         return (reachable / (n - 1)) * (reachable / total_dist)
 
 
@@ -205,7 +198,7 @@ class Graph:
                 pred[neighbor] = curr
 
                 if neighbor == target_name:
-                    # Build path
+                    # path backtracking
                     path = []
                     step = neighbor
                     while step is not None:
@@ -214,7 +207,7 @@ class Graph:
                     path.reverse()
                     return path
 
-        return []  # couldn't find target
+        return []  # no path
 
 
     def export_json(self, path="fighters_data.json"):
